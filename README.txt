@@ -53,12 +53,12 @@ Notes:
 	38) Duality gap
 	39) Duality gap - as a percent
 	40) Length of nondominated subset of the dual bound
-	41) Length of nondominated subset of the dual bound - measured as a percentage of the max of the f1-range and f2-range
-	    in the objective space
+	41) Length of nondominated subset of the dual bound - measured as a percentage of the max of the f1-range and 
+	    f2-range in the objective space
 	
-	This file is written in "append" format, i.e., its contents are not overwritten each time a new instance is run. Thus,
-	the file is designed to have its contents copied and pasted into a spreadsheet so that multiple instances can be    
-	compared.
+	This file is written in "append" format, i.e., its contents are not overwritten each time a new instance is run. 
+	Thus, the file is designed to have its contents copied and pasted into a spreadsheet so that multiple instances can 
+	be compared.
 	
 	_______________________________________________________________________________________________________________________________________________
 	
@@ -83,7 +83,7 @@ Notes:
                                                         approaches and will therefore impact whichever procedure is 
                                                         indicated above. (default value - 1)
 				                                        
-	5) -ppExtra         Values: T - Utilize CPLEX's populate command instead of its mipopt command. This can help find
+    5) -ppExtra         Values: T - Utilize CPLEX's populate command instead of its mipopt command. This can help find
 	                                extra solutions during preprocessing for difficult problems, but it can also add 
 	                                significant time.
                                 F - Use mipopt (default)
@@ -100,7 +100,7 @@ Notes:
                                                         determine additional nondominated integer feasible solutions not 
                                                         discovered during preprocessing. (default value - 0)
 							                            
-	8) -presolve2       Values: T - Presolve phase 2 is turned on. Note that presolve phase 2 cannot be turned on if 
+    8) -presolve2       Values: T - Presolve phase 2 is turned on. Note that presolve phase 2 cannot be turned on if 
 	                                preprocessing is turned off.
                                 F - Presolve phase 2 is turned off (default)
                                 
