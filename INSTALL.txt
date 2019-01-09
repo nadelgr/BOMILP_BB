@@ -1,13 +1,9 @@
-This code is designed for use with the Linux operating system. To install, open the "Makefile" and set the appropriate directories at the top of the file. If desired, prior to installation one can set a variety of user-defined parameters from the file "user_set_parameters.h". To compile, open a terminal, change the working directory to the folder containing this file, type "make" and hit enter. 
+This code is designed for use with the Linux operating system. To install, open the "Makefile" and set the appropriate directories at the top of the file (paths to current directory and CPLEX directory). To compile, open a terminal, change the working directory to the folder containing this file, type "make" and hit enter. 
 
 To run the software, open a terminal, change the working directory to the folder containing this file, and type "./bb_solver" followed by these arguments:
 
-(1) Path to input LP file 1 - This file MUST be an LP file (http://www.ibm.com/support/knowledgecenter/SS9UKU_12.4.0/com.ibm.cplex.zos.help/FileFormats/topics/
-			      LP.html) whose objective function is the function to be considered as objective 1 for the biobjective problem and whose feasible set is
-			      the feasible set of the biobjective problem.
-(2) Path to input LP file 2 - This file MUST be an LP file whose objective function is the function to be considered as objective 2 for the biobjective problem and
-			      whose feasible set is the feasible set of the biobjective problem. **IMPORTANT NOTE** -- This software will NOT FUNCTION CORRECTLY if
-		          corresponding vairables in "file 1" and "file 2" do not appear for the first time in the same order.
+(1) Path to input LP file 1 - This file MUST be an LP file (http://www.ibm.com/support/knowledgecenter/SS9UKU_12.4.0/com.ibm.cplex.zos.help/FileFormats/topics/LP.html) whose objective function is the function to be considered as objective 1 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem.
+(2) Path to input LP file 2 - This file MUST be an LP file whose objective function is the function to be considered as objective 2 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem. **IMPORTANT NOTE** -- This software will NOT FUNCTION CORRECTLY if corresponding vairables in "file 1" and "file 2" do not appear for the first time in the same order.
 (3) Additional commands (optional) - For a list of optional command line flags, see README.txt.
 
 Examples of running the software with no additional flags:  "./bb_solver testp1.lp testp2.lp"
