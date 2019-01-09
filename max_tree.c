@@ -225,34 +225,82 @@ void print_preorder(node *n1, FILE *file)
    	}
 }
 
-void print_inorder(node *n1, int color)
+void print_inorder(node *n1, int color, int print_to_file, FILE *pareto_results, int matlab_style)
 {	
     	if (n1)
     	{	
    		if(n1->left)
 		{
 			//printf("left child:\n");
-		  print_inorder(n1->left,color);
+		  print_inorder(n1->left,color, print_to_file, pareto_results, matlab_style);
         	}
 		// Uncomment the following lines in order to print MATLAB syntax for plotting the Pareto optimal solutions
 		if(n1->type == 2)
 		{
-  	    		if(color == 1) printf("plot([%lf,%lf],[%lf,%lf],'-ro');\n",x_ideal-n1->nw_x,x_ideal-n1->se_x,y_ideal-n1->nw_y,y_ideal-n1->se_y);
-  	    		else if(color == 2) printf("plot([%lf,%lf],[%lf,%lf],'-bo');\n",x_ideal-n1->nw_x,x_ideal-n1->se_x,y_ideal-n1->nw_y,y_ideal-n1->se_y);
+  	    		if(color == 1) 
+  	    		{
+  	    		    if(matlab_style) 
+  	    		    {
+  	    		        if(!print_to_file) printf("plot([%lf,%lf],[%lf,%lf],'-ro');\n",x_ideal-n1->nw_x,x_ideal-n1->se_x,y_ideal-n1->nw_y,y_ideal-n1->se_y);
+  	    		        else fprintf(pareto_results, "plot([%lf,%lf],[%lf,%lf],'-ro');\n",x_ideal-n1->nw_x,x_ideal-n1->se_x,y_ideal-n1->nw_y,y_ideal-n1->se_y);
+  	    		    }
+  	    		    else
+  	    		    {
+  	    		        if(!print_to_file) printf("(%lf,%lf)\t --\t (%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y,x_ideal-n1->se_x,y_ideal-n1->se_y);
+  	    		        else fprintf(pareto_results, "(%lf,%lf)\t --\t (%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y,x_ideal-n1->se_x,y_ideal-n1->se_y);
+  	    		    }
+  	    		}
+  	    		else if(color == 2) 
+  	    		{
+  	    		    if(matlab_style) 
+  	    		    {
+  	    		        if(!print_to_file) printf("plot([%lf,%lf],[%lf,%lf],'-bo');\n",x_ideal-n1->nw_x,x_ideal-n1->se_x,y_ideal-n1->nw_y,y_ideal-n1->se_y);
+  	    		        else fprintf(pareto_results, "plot([%lf,%lf],[%lf,%lf],'-bo');\n",x_ideal-n1->nw_x,x_ideal-n1->se_x,y_ideal-n1->nw_y,y_ideal-n1->se_y);
+  	    		    }
+  	    		    else
+  	    		    {
+  	    		        if(!print_to_file) printf("(%lf,%lf)\t --\t (%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y,x_ideal-n1->se_x,y_ideal-n1->se_y);
+  	    		        else fprintf(pareto_results, "(%lf,%lf)\t --\t (%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y,x_ideal-n1->se_x,y_ideal-n1->se_y);
+  	    		    }
+  	    		}
 /*  	    		if(color == 1) printf("plot([%lf,%lf],[%lf,%lf],'-rx');\n",n1->nw_x,n1->se_x,n1->nw_y,n1->se_y);*/
 /*  	    		else if(color == 2) printf("plot([%lf,%lf],[%lf,%lf],'-bo');\n",n1->nw_x,n1->se_x,n1->nw_y,n1->se_y);*/
 		}
 		else 
 		{
-			if(color == 1) printf("plot(%lf,%lf,'ro');\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
-			else if(color == 2) printf("plot(%lf,%lf,'bo');\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+		    if(color == 1) 
+    		{
+    		    if(matlab_style) 
+    		    {
+    		        if(!print_to_file) printf("plot(%lf,%lf,'ro');\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		        else fprintf(pareto_results, "plot(%lf,%lf,'ro');\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		    }
+    		    else
+    		    {
+    		        if(!print_to_file) printf("(%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		        else fprintf(pareto_results, "(%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		    }
+    		}
+    		else if(color == 2) 
+    		{
+    		    if(matlab_style) 
+    		    {
+    		        if(!print_to_file) printf("plot(%lf,%lf,'bo');\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		        else fprintf(pareto_results, "plot(%lf,%lf,'bo');\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		    }
+    		    else
+    		    {
+    		        if(!print_to_file) printf("(%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		        else fprintf(pareto_results, "(%lf,%lf)\n",x_ideal-n1->nw_x,y_ideal-n1->nw_y);
+    		    }
+    		}
 /*			if(color == 1) printf("plot(%lf,%lf,'rx');\n",n1->nw_x,n1->nw_y);*/
 /*			else if(color == 2) printf("plot(%lf,%lf,'bo');\n",n1->nw_x,n1->nw_y);*/
 		}
         	if(n1->right)
         	{
         		//printf("right child:\n");
-		  print_inorder(n1->right,color);
+		  print_inorder(n1->right,color, print_to_file, pareto_results, matlab_style);
         	}
    	}
 }

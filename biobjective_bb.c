@@ -14,6 +14,7 @@ Pietro Belotti. I collaborated on this work.)*/
 #include <signal.h>
 #include <time.h>
 #include <pthread.h>
+#include <ctype.h>
 
 #include "cplex.h"
 #include "max_tree.h"
@@ -21,6 +22,7 @@ Pietro Belotti. I collaborated on this work.)*/
 #include "callbacks.h"
 /*#include "presolve_phase1.h"*/
 #include "biobjective_bb.h"
+#include "minor_functions.h"
 
 /*******************************************************************/
 /*              CPLEX VARIABLES                                    */
@@ -51,6 +53,7 @@ int real_numsols = 0;
 /*******************************************************************/
 
 FILE *bb_results;
+FILE *pareto_results;
 FILE *output2;
 
 split_pt *first_split_pt = NULL;
@@ -95,319 +98,10 @@ int cols_have_been_deleted = 0;
 
 /*******************************************************************/
 
-void chg_coefs_(CPXCENVptr env, CPXLPptr prob, int *indices, double slope);
+/*void chg_coefs_(CPXCENVptr env, CPXLPptr prob, int *indices, double slope);*/
 void chg_coefs2(CPXCENVptr env, CPXLPptr prob, int *indices, double lambda);
 
-double gcd(double x, double y)
-{
-	printf("Calculating the gcd between %lf and %lf.",x,y);
-        int i, x_, y_;
-        x_ = floor(fabs(x));
-        y_ = floor(fabs(y));
-        for(i=x_;i>=1;i--)
-        {
-        	if(x_%i == 0 && y_%i == 0) break;
-        }
-      printf(" The result is %lf.\n",(double) i);
-        return (double) i;
-}
 
-/*********************************************************************************************************************** 
-
-	This function is currently unused, but was designed for adding a globally valid cut along
-	the level curve in the objective space associated with the best known dual bound after solving
-	any weighted sum MIPs during preprocessing.
-	
-***********************************************************************************************************************/
-
-void add_mip_cut(CPXCENVptr env, CPXLPptr prob1, CPXLPptr prob2, CPXLPptr prob3, double slp, double bound, 
-			double *ob1coef, double *ob2coef, double *wtd_coefs, int *indices)
-{
-	int status,i;
-	double rhs = 0.;
-	double val = -1.;
-	double lb = -CPX_INFBOUND;
-	double ub = bound + .001;
-	char sense[1] = {'E'};
-	int rmatbeg[1] = {0};
-	
-/*	printf("slope: %lf\n",slp);*/
-/*	*/
-/*	for(i=0;i<cur_numcols;i++) */
-/*	{*/
-/*		printf("wtd%d: %lf, ob1_%d: %lf, obj2_%d: %lf\n",i,wtd_coefs[i],i,ob1coef[i],i,ob2coef[i]);*/
-/*		wtd_coefs[i] = (-1./slp)*ob2coef[i] + ob1coef[i];*/
-/*		printf("new wtd%d: %lf\n",i,wtd_coefs[i]);*/
-/*	}*/
-	
-	status = CPXaddrows (env, prob1, 0, 1, cur_numcols, &rhs,
-                      sense, rmatbeg, indices, wtd_coefs, NULL, NULL);
-        status = CPXaddrows (env, prob2, 0, 1, cur_numcols, &rhs,
-                      sense, rmatbeg, indices, wtd_coefs, NULL, NULL);
-        status = CPXaddrows (env, prob3, 0, 1, cur_numcols, &rhs,
-                      sense, rmatbeg, indices, wtd_coefs, NULL, NULL);
-        
-        status = CPXaddcols (env, prob1, 1, 1, NULL, rmatbeg,
-                      &cur_numrows, &val, &lb, &ub, NULL);
-        status = CPXaddcols (env, prob2, 1, 1, NULL, rmatbeg,
-                      &cur_numrows, &val, &lb, &ub, NULL);
-        status = CPXaddcols (env, prob3, 1, 1, NULL, rmatbeg,
-                      &cur_numrows, &val, &lb, &ub, NULL);
-                      
-/*        status = CPXwriteprob (env, prob2, "myprob2.lp", "LP");*/
-/*        exit(0);*/
-        
-        cur_numrows++;
-        cur_numcols++;
-        obj1_index = cur_numcols;
-}
-
-/*********************************************************************************************************************** 
-
-	This function is currently unused, but was designed for adding no good constraints associated 
-	with discovered solutions for binary problems.
-	
-***********************************************************************************************************************/
-
-void add_binary_cut(CPXCENVptr env, CPXLPptr prob1, CPXLPptr prob2, double *x, int *indices, double *coefs)
-{
-	int status,i,k;
-	double rhs = -1.;
-	char sense[1] = {'L'};
-	int rmatbeg[1] = {0};
-	
-	for(i=0;i<total_num_integer;i++)
-	{
-		k = integer_indices[i];
-		if(x[k] == 1)
-		{
-			coefs[i] = 1.;
-			rhs++;
-		}
-		else coefs[i] = -1.;
-	}
-	
-	status = CPXaddrows (env, prob1, 0, 1, total_num_integer, &rhs,
-                      sense, rmatbeg, integer_indices, coefs, NULL, NULL);
-        if(prob2) status = CPXaddrows (env, prob2, 0, 1, total_num_integer, &rhs,
-                      sense, rmatbeg, integer_indices, coefs, NULL, NULL);
-        cur_numrows++;
-        
-/*        for(i=0;i<cur_numcols;i++) printf("x%d: %lf\n",i,x[i]);*/
-/*        status = CPXwriteprob (env, prob1, "myprob1.lp", "LP");*/
-/*        status = CPXwriteprob (env, prob2, "myprob2.lp", "LP");*/
-/*        exit(0);*/
-}
-
-/*********************************************************************************************************************** 
-
-	Used for qsort.
-	
-***********************************************************************************************************************/
-
-int comparison_function2(const void *a, const void *b)
-{
-	return ( *(int*)b - *(int*)a );
-}
-
-int comparison_function4(const void *a, const void *b)
-{
-	if( ((const struct store_it *)a)->ratio < ((const struct store_it *)b)->ratio ) return 1;
-	return 0;
-}
-
-/*********************************************************************************************************************** 
-
-	The following two functions are unused, but were originally designed for using equality 
-	constraints to substitute variables out of the model. After thinking about it, though, I
-	realized that it isn't helpful when variables have bounds.
-	
-***********************************************************************************************************************/
-
-double** make_two_d_array(int arraySizeX, int arraySizeY) 
-{
-	int i;
-	double** theArray;
-	theArray = (double**) malloc(arraySizeX*sizeof(double*));
-	for (i = 0; i < arraySizeX; i++) theArray[i] = (double*) malloc(arraySizeY*sizeof(double));
-   	return theArray;
-} 
-
-void remove_equalities(CPXCENVptr env, CPXLPptr prob1, CPXLPptr prob2, char *xctype, double *obj1_coef, double *obj2_coef, int *indices)
-{
-	double **A = make_two_d_array(cur_numrows,cur_numcols);
-	
-	int nzcnt,surplus;
-	int *cmatbeg = (int*) malloc(cur_numcols*sizeof(int));
-	int *cmatind = (int*) malloc(cur_numcols*cur_numrows*sizeof(int));
-	double *cmatval = (double*) malloc(cur_numcols*cur_numrows*sizeof(double));
-	double *rhs = (double *) malloc (cur_numrows*sizeof(double));
-	char *sense = (char *) malloc (cur_numrows*sizeof(char));
-	int *rows_to_delete = (int*) malloc((cur_numrows+1)*sizeof(int));
-	int *cols_to_delete = (int*) malloc((cur_numcols+1)*sizeof(int));
-	double *new_vals = (double*) malloc(cur_numcols*sizeof(double));
-	int num_rows_to_delete = 0;
-	int num_cols_to_delete = 0;
-	rows_to_delete[num_rows_to_delete] = -1;
-	cols_to_delete[num_cols_to_delete] = -1;
-	
-	status = CPXgetcols (env, prob1, &nzcnt, cmatbeg, cmatind,
-                      cmatval, cur_numcols*cur_numrows, &surplus, 0,
-                      cur_numcols-1);
-                      
-        status = CPXgetrhs (env, prob1, rhs, 0, cur_numrows-1);
-        
-        status = CPXgetsense (env, prob1, sense, 0, cur_numrows-1);
-        
-        int i,j;
-        int k = 0;
-        
-        for(i=0;i<cur_numrows;i++) for(j=0;j<cur_numcols;j++) A[i][j] = 0;
-        
-        for(i=0;i<nzcnt;i++)
-        {
-        	if(i == cmatbeg[k+1]) k++;
-        	A[cmatind[i]][k] = cmatval[i];
-        }
-        k = 0;
-        
-/*        for(i=0;i<cur_numrows;i++) */
-/*        {*/
-/*        	for(j=0;j<cur_numcols;j++) printf("%lf ",A[i][j]);*/
-/*        	printf("\n");*/
-/*        }*/
-        
-        int l;
-        for(i=0;i<cur_numrows;i++)
-        {
-/*        	printf("considering row %d\n",i);*/
-        	k = 0;
-        	if(sense[i] == 'E')
-        	{
-/*        		printf("the row is an equality constraint\n");*/
-        		while( ( (A[i][k] < 0.00001 && A[i][k] > -0.000001) || xctype[k] == 'I' || xctype[k] == 'B') && k < cur_numcols) k++;
-        		if(k < cur_numcols)
-        		{
-/*        			printf("solving for x%d\n",k);*/
-        			if(obj1_coef[k] != 0) 
-        			{
-        				for(j=0;j<cur_numcols;j++)
-        				{
-        					new_vals[j] = obj1_coef[j] - obj1_coef[k]*A[i][j]/A[i][k];
-        				}
-        				obj1_extra_val += obj1_coef[k]*rhs[i]/A[i][k];
-        				for(j=0;j<cur_numcols;j++)
-        				{
-        					obj1_coef[j] = new_vals[j];
-/*        					printf("obj1_coef%d: %lf\n",j,obj1_coef[j]);*/
-        				}
-        			}
-        			if(obj2_coef[k] != 0) 
-        			{
-        				for(j=0;j<cur_numcols;j++)
-        				{
-        					new_vals[j] = obj2_coef[j] - obj2_coef[k]*A[i][j]/A[i][k];
-        				}
-        				obj2_extra_val += obj2_coef[k]*rhs[i]/A[i][k];
-        				for(j=0;j<cur_numcols;j++)
-        				{
-        					obj2_coef[j] = new_vals[j];
-/*        					printf("obj2_coef%d: %lf\n",j,obj2_coef[j]);*/
-        				}
-        			}
-        			
-        			for(l=0;l<cur_numrows;l++)
-        			{
-/*        				printf("changing row coefs\n");*/
-        				if(l != i)
-					{
-						for(j=0;j<cur_numcols;j++)
-						{
-							new_vals[j] = A[l][j] - A[l][k]*A[i][j]/A[i][k];
-						}
-						rhs[l] -= A[l][k]*rhs[i]/A[i][k];
-						A[l][k] = 0;
-						for(j=0;j<cur_numcols;j++)
-						{
-							A[l][j] = new_vals[j];
-/*							printf("A%d,%d: %lf\n",l,j,A[l][j]);*/
-						}
-					}
-					else
-					{
-						for(j=0;j<cur_numcols;j++)
-						{
-							new_vals[j] = A[i][j]/A[i][k];
-						}
-						rhs[l] = rhs[i]/A[i][k];
-						A[l][k] = 0;
-						for(j=0;j<cur_numcols;j++)
-						{
-							A[l][j] = new_vals[j];
-/*							printf("A%d,%d: %lf\n",l,j,A[l][j]);*/
-						}
-					}
-				}
-				sense[i] = 'L';
-        			rows_to_delete[num_rows_to_delete] = i;
-        			rows_to_delete[num_rows_to_delete+1] = -1;
-				cols_to_delete[num_cols_to_delete] = k;
-				cols_to_delete[num_cols_to_delete+1] = -1;
-				num_rows_to_delete++;
-				num_cols_to_delete++;
-        		}
-        	}
-        }
-        
-        status = CPXchgobj (env, prob1, cur_numcols, indices, obj1_coef);
-        status = CPXchgobj (env, prob2, cur_numcols, indices, obj2_coef);
-        status = CPXchgrhs (env, prob1, cur_numrows, indices, rhs);
-        status = CPXchgrhs (env, prob2, cur_numrows, indices, rhs);
-        
-/*        qsort(rows_to_delete, num_rows_to_delete, sizeof(int), comparison_function2);*/
-        qsort(cols_to_delete, num_cols_to_delete, sizeof(int), comparison_function2);
-        
-        k = 0;
-        for(i=0;i<cur_numrows;i++)
-        {
-/*        	if(i != rows_to_delete[k])*/
-/*        	{*/
-        		l = 0;
-			for(j=0;j<cur_numcols;j++)
-			{
-				if(j != cols_to_delete[l])
-				{
-					status = CPXchgcoef (env, prob1, i, j, A[i][j]);
-					status = CPXchgcoef (env, prob2, i, j, A[i][j]);
-				}
-				else l++;
-			}
-/*		}*/
-/*		else k++;*/
-        }
-        
-        for(i=0;i<num_cols_to_delete;i++) 
-        {
-/*        	status = CPXdelrows (env, prob1, rows_to_delete[i], rows_to_delete[i]);*/
-/*        	status = CPXdelrows (env, prob2, rows_to_delete[i], rows_to_delete[i]);*/
-        	status = CPXdelcols (env, prob1, cols_to_delete[i], cols_to_delete[i]);
-        	status = CPXdelcols (env, prob2, cols_to_delete[i], cols_to_delete[i]);
-        }
-        
-        status = CPXchgsense (env, prob1, num_rows_to_delete, rows_to_delete, sense);
-        status = CPXchgsense (env, prob2, num_rows_to_delete, rows_to_delete, sense);
-        
-        free(cmatbeg);
-	free(cmatind);
-	free(cmatval);
-	free(rhs);
-	free(sense);
-	free(rows_to_delete);
-	free(cols_to_delete);
-	free(new_vals);
-	for(i=0;i<cur_numrows;i++) free(A[i]);
-	free(A);	
-}
 
 /*********************************************************************************************************************** 
 
@@ -884,25 +578,824 @@ int main(int argc, char **argv)
 	insert_time2 = 0.;
 	accum = 0.;
 	srand(1);
-	if(argc < 4) 
+	if(argc < 3) 
 	{
-		if(argc < 3)
-		{
-			printf("Error! Not enough input files.\n\nPlease include 2 input LP files having the same feasible set and different objective functions. Also ensure that in both files variables appear for the first time in the same order.\n\nAdditionally, please include a binary flag: 0 if you do NOT wish to have the final Pareto set displayed in MATLAB readable format, or 1 if you DO wish to display this information.\n\n");
-			exit(0);
-		}
-		else
-		{
-			printf("Error! Not enough input files.\n\nAfter including your input files, please include a binary flag: 0 if you do NOT wish to have the final Pareto set displayed in MATLAB readable format, or 1 if you DO wish to display this information.\n");
-			exit(0);
-		}
-	}
-	int print_Pareto = atoi(argv[3]);
-	if(print_Pareto != 0 && print_Pareto != 1)
-	{
-		printf("Error! The third argument for this executable should be a binary flag: 0 if you do NOT wish to have the final Pareto set displayed in MATLAB readable format, or 1 if you DO wish to display this information.\n");
+		printf("Error! Not enough input files.\n\nPlease include 2 input LP files having the same feasible set and different objective functions. Also ensure that in both files variables appear for the first time in the same order.\n\nAdditionally, please include a binary flag: 0 if you do NOT wish to have the final Pareto set displayed in MATLAB readable format, or 1 if you DO wish to display this information.\n\n");
 		exit(0);
 	}
+	int print_Pareto = 0;
+	
+	/*************************************************************/
+	/*          Process command line flags                       */
+	/*************************************************************/
+	
+	int i = 3;
+	int opened_bb_results = 0;
+	int suppress_file_output = 0;
+	int write_tree_results = 0;
+	int matlab = 1;
+	while(i < argc)
+    {
+        if(argv[i][0] != '-')
+        {
+            printf("Invalid Command Line Argument (missing '-'). Exiting.\n");
+	        printf("Got %s\n", argv[i]);
+            exit(0);
+        }
+        else
+        {
+            if(!strcmp(argv[i],"-presolve1"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    presolve_phase_1 = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    presolve_phase_1 = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-presolve1', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-preprocessing"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    preprocessing = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    preprocessing = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-preprocessing', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-ppType"))
+            {
+                i++;
+                if(atoi(argv[i]) < 0 || atoi(argv[i]) > 3) printf("Invalid value for flag '-ppType', ignoring. Valid values are 0 through 3.\n");
+                else preprocessing_method = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-ppParam"))
+            {
+                i++;
+                if(atoi(argv[i]) < 0 ) printf("Invalid value for flag '-ppParam', ignoring. Valid values are nonnegative integers.\n");
+                else preprocessing_parameter = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-ppExtra"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    search_for_extra_solutions_during_preprocessing = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    search_for_extra_solutions_during_preprocessing = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-ppExtra', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-ppCuts"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    add_local_cuts_during_preprocessing = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    add_local_cuts_during_preprocessing = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-ppCuts', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-ppGenetic"))
+            {
+                i++;
+                if(atoi(argv[i]) < 0 ) printf("Invalid value for flag '-ppGenetic', ignoring. Valid values are nonnegative integers.\n");
+                else times_to_try_heuristic_per_preprocessing_iteration = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-presolve2"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    presolve_phase_2 = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    presolve_phase_2 = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-presolve2', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-osFathom"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    objective_space_fathoming = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    objective_space_fathoming = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-osFathom', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-cutStrength"))
+            {
+                i++;
+                if(atoi(argv[i]) < 0 || atoi(argv[i]) > 2) printf("Invalid value for flag '-cutStrength', ignoring. Valid values are 0 through 2.\n");
+                else CPLEX_cuts = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-cutMulti"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    generate_CPLEX_global_cuts_for_several_weighted_sum_objectives = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    generate_CPLEX_global_cuts_for_several_weighted_sum_objectives = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-cutMulti', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-cutNum"))
+            {
+                i++;
+                if(atoi(argv[i]) < 1) printf("Invalid value for flag '-cutNum', ignoring. Valid values are positive integers.\n");
+                else num_iterations_weights = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-cutLocal"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    generate_local_cuts = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    generate_local_cuts = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-cutLocal', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-intObj"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    integer_bb = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    integer_bb = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-intObj', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-bndRed"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    bd_reduction_during_branching = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    bd_reduction_during_branching = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-bndRed', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-bndInf"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    only_infeasibility = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    only_infeasibility = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-bndInf', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-bndFull"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    check_bound = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    check_bound = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-bndFull', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-bndLimit"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    limit_bd_reduction = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    limit_bd_reduction = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-bndLimit', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-psaEarly"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    check_for_early_PSA_reduce = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    check_for_early_PSA_reduce = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-psaEarly', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-psaEarlyN"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    check_for_early_PSA_reduce_after_n_iter = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    check_for_early_PSA_reduce_after_n_iter = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-psaEarlyN', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-psaIter"))
+            {
+                i++;
+                if(atoi(argv[i]) < 1) printf("Invalid value for flag '-psaIter', ignoring. Valid values are positive integers.\n");
+                else n_iter = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-psaStop"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    stop_PSA_full_early_after_preprocessing = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    stop_PSA_full_early_after_preprocessing = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-psaStop', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-extraMIPs"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    solve_extra_mips_during_cut_callback = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    solve_extra_mips_during_cut_callback = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-extraMIPs', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-gaps"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    exploit_objective_gaps = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    exploit_objective_gaps = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-gaps', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-osDisj"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    generate_disjunctive_cuts_from_obj_space_disjunctions = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    generate_disjunctive_cuts_from_obj_space_disjunctions = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-osDisj', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-showProgress"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    show_progress = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    show_progress = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-showProgress', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-showFreq"))
+            {
+                i++;
+                if(atoi(argv[i]) < 1) printf("Invalid value for flag '-showFreq', ignoring. Valid values are positive integers.\n");
+                else show_frequency = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-showProgress"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    show_progress = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    show_progress = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-showProgress', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-hausHyper"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'A')
+                {
+                    hausdorff_or_hypervolume = 1;
+                }
+                else if(toupper(argv[i][0]) == 'Y')
+                {
+                    hausdorff_or_hypervolume = 2;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-hausHyper', ignoring. Valid values are 'A' (for h(A)usdorff) and 'Y' (for h(Y)pervolume).\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-nodeSel"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    control_node_selection = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    control_node_selection = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-nodeSel', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-nodeSelPerc")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0 && atof(argv[i]) < 1) 
+		        {
+		            control_percentage = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-nodeSelPerc', ignoring. Valid values are reals in (0,1).\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-nodeSelVar"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    allow_changing_control_percentage = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    allow_changing_control_percentage = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-nodeSelVar', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-nodeSelPerc1")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0 && atof(argv[i]) < 1) 
+		        {
+		            starting_percentage = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-nodeSelPerc1', ignoring. Valid values are reals in (0,1).\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-nodeSelPerc2")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0 && atof(argv[i]) < 1) 
+		        {
+		            stopping_percentage = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-nodeSelPerc2', ignoring. Valid values are reals in (0,1).\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-domCol"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    dominating_columns = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    dominating_columns = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-domCol', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-domColCuts"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    generate_disjunctive_cuts_from_dominated_columns = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    generate_disjunctive_cuts_from_dominated_columns = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-domColCuts', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-dualFix"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    duality_fixing = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    duality_fixing = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-dualFix', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-singCol"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    singleton_columns = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    singleton_columns = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-singCol', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-limitType"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    time_vs_node_lim = 0;
+                }
+                else if(toupper(argv[i][0]) == 'N')
+                {
+                    time_vs_node_lim = 1;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-limitType', ignoring. Valid values are 'T' (for (T)ime) and 'N' (for (N)ode).\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-proveInfeas"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    keep_solving_infeasible_MIPs = 0;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    keep_solving_infeasible_MIPs = 1;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-proveInfeas', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-bbTime")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            max_time = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-bbTime', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-bbNodes"))
+            {
+                i++;
+                if(atoi(argv[i]) < 1) printf("Invalid value for flag '-bbNodes', ignoring. Valid values are positive integers.\n");
+                else max_nodes = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-mipTime")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            time_limit = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-mipTime', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-mipNode"))
+            {
+                i++;
+                if(atoi(argv[i]) < 1) printf("Invalid value for flag '-mipNode', ignoring. Valid values are positive integers.\n");
+                else node_limit = atoi(argv[i]);
+		        i++;
+            }
+            else if(!strcmp(argv[i],"-presolve1time")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            max_phase1_time = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-presolve1time', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-presolve2time")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            max_time_phase_2 = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-presolve2time', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-bndRedTime")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            max_time_bd_red_b4_branching = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-bndRedTime', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-ppTime")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            max_preprocessing_time = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-ppTime', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-dualGapLimit")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            duality_gap_limit = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-dualGapLimit', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-dualTime")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) > 0) 
+		        {
+		            max_time_build_dual_bound = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-dualTime', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-probePerc")) 
+            {
+                i++;
+		        if (argv[i] != NULL && atof(argv[i]) >= 0. && atof(argv[i]) <= 100.) 
+		        {
+		            percentage_of_integer_variables_to_check_for_probing_during_presolve = atof(argv[i]);
+		            i++;
+		        } 
+		        else 
+		        {
+                    printf("Invalid value for flag '-probePerc', ignoring. Valid values are positive reals.\n");
+		        }
+            }
+            else if(!strcmp(argv[i],"-out"))
+            {
+                i++;
+                if(strcmp(argv[i],"none"))
+                {
+                    if ((bb_results = fopen (argv[i], "a+"))==NULL)
+	            	{
+	            		printf("could not open output file, exiting\n");
+	              		fprintf (stderr, "could not open output file, exiting\n");
+	              		exit(1);
+	            	}
+	        	}
+	        	else suppress_file_output = 1;
+	        	opened_bb_results = 1;
+                i++;
+            }
+            else if(!strcmp(argv[i],"-print"))
+            {
+                i++;
+                if(!strcmp(argv[i],"T"))
+                {
+                    print_Pareto = 1;
+                }
+                else if(!strcmp(argv[i],"F"))
+                {
+                    print_Pareto = 0;
+                }
+                else 
+                {
+                    print_Pareto = 2;
+                    if ((pareto_results = fopen (argv[i], "w"))==NULL)
+                	{
+                		printf("could not open output file, exiting\n");
+                  		fprintf (stderr, "could not open output file, exiting\n");
+                  		exit(1);
+                	}
+                }
+                i++;
+            }
+            else if(!strcmp(argv[i],"-matlab"))
+            {
+                i++;
+                if(toupper(argv[i][0]) == 'T')
+                {
+                    matlab = 1;
+                }
+                else if(toupper(argv[i][0]) == 'F')
+                {
+                    matlab = 0;
+                }
+                else
+                {
+                    printf("Invalid value for flag '-matlab', ignoring. Valid values are 'T' and 'F'.\n");
+                }
+                i++;
+            }
+            else
+            {
+                printf("'%s' is an invalid command line flag. Exiting!\nFor a list of valid flags, see 'README.txt'\n", argv[i]);
+                exit(0);
+            }
+        }
+     }
 
 	/* initialize Cplex environment *********************************/
 	
@@ -922,31 +1415,28 @@ int main(int argc, char **argv)
     	
     	/********* Open file for storing results ************************/
     	
-    	if(argc >=5)
+    	if(!suppress_file_output)
     	{
-	    	if ((bb_results = fopen (argv[4], "a+"))==NULL)
-	    	{
-	    		printf("could not open output file, exiting\n");
-	      		fprintf (stderr, "could not open output file, exiting\n");
-	      		exit(1);
-	    	}
-    	}
-    	else
-    	{
-	    	if ((bb_results = fopen ("bb_results.txt", "a+"))==NULL)
-	    	{
-	    		printf("could not open output file, exiting\n");
-	      		fprintf (stderr, "could not open output file, exiting\n");
-	      		exit(1);
-	    	}
-    	}
-    	
-    	if ((output2 = fopen ("tree_results.txt", "w"))==NULL)
-	    	{
-	    		printf("could not open output file, exiting\n");
-	      		fprintf (stderr, "could not open output file, exiting\n");
-	      		exit(1);
-	    	}
+        	if(!opened_bb_results)
+        	{
+	        	if ((bb_results = fopen ("bb_results.txt", "a+"))==NULL)
+	        	{
+	        		printf("could not open output file, exiting\n");
+	          		fprintf (stderr, "could not open output file, exiting\n");
+	          		exit(1);
+	        	}
+        	}
+        	
+        	if(write_tree_results)
+        	{
+        	    if ((output2 = fopen ("tree_results.txt", "w"))==NULL)
+	        	{
+	        		printf("could not open output file, exiting\n");
+	          		fprintf (stderr, "could not open output file, exiting\n");
+	          		exit(1);
+	        	}
+	        }
+	    }
     	
     	/******************************************************************/
 
@@ -1066,7 +1556,7 @@ int main(int argc, char **argv)
     	row_sense = (char *) malloc ((cur_numrows)*sizeof(char));
     	status = CPXgetsense (env, lp1, row_sense, 0, cur_numrows-1);
     	
-    	int i = 0, j = 0, equalities = 0;
+    	int j = 0, equalities = 0;
     	for(i = 0;i<cur_numrows;i++)
     	{
     		if(row_sense[i] == 'G')
@@ -1260,10 +1750,10 @@ int main(int argc, char **argv)
 		status = run_presolve_phase1	(cur_numcols, bb_results, num_fixed_phase1, num_singleton_columns1, num_singleton_columns2, obj_coef1,		
 						 obj_coef2, redlp1, redlp2, env, cmatbeg, row_indices, column_entries, cur_numrows, lp1, sense2, fix_it,	
 						 xctype, singleton_column_indices2, their_rows1, their_rows2, sym, l, u, lp2, singleton_column_indices1,
-						 col_indices, row_entries, lower_bound, upper_bound);
+						 col_indices, row_entries, lower_bound, upper_bound, suppress_file_output);
 		if(status) goto TERMINATE;
 	}
-	else
+	else if(!suppress_file_output)
 	{
 		fprintf(bb_results,"%d\t",0);
 		fprintf(bb_results,"%d\t",0);
@@ -1321,7 +1811,7 @@ int main(int argc, char **argv)
 	duration_presolve = (double)(finish_presolve - start_BB) / CLOCKS_PER_SEC;
   	printf("*******************\nTotal time spent until end of presolve phase 1: %lf\n************************\n",
 		  									duration_presolve);
-	fprintf(bb_results,"%lf\t",duration_presolve);
+	if(!suppress_file_output) fprintf(bb_results,"%lf\t",duration_presolve);
   	
 /*  	if(cur_numcols < 40) yet_another_preprocessing_algorithm = 0;*/
     	
@@ -1701,7 +2191,7 @@ int main(int argc, char **argv)
 	  	{
 			status = epsilon_constraint_preprocessing(yet_another_preprocessing_algorithm, start_presolve, env, lp1, indices, obj_coef2, ub, lb,
 								  cur_numcols, lp2, split_pt_denom2, finish_presolve, preprocessing_time, duration_presolve, 
-								  bb_results, num_mips_to_solve, numsols);
+								  bb_results, num_mips_to_solve, numsols, suppress_file_output);
 			if(status) goto TERMINATE;
 	  	}
 	  	else if(preprocessing_method == 1 || preprocessing_method == 3 || (preprocessing_method == 0 && !exact_mips))
@@ -1709,7 +2199,7 @@ int main(int argc, char **argv)
 			if(preprocessing_method == 3 || preprocessing_method == 0) intervals = 1;
 			else intervals = 0;
 			status = weighted_sum_preprocessing    (start_presolve, lp1, lp2, env, cur_numcols, cur_numrows, indices, obj_coef2, intervals, run_it, 
-								split_pt_denom, finish_presolve, preprocessing_time, duration_presolve, bb_results, obj_coef1);
+								split_pt_denom, finish_presolve, preprocessing_time, duration_presolve, bb_results, obj_coef1, suppress_file_output);
 			if(status) goto TERMINATE;
 	  	}
 	  	status = CPXsetdblparam (env, CPX_PARAM_TILIM, max_time);
@@ -1730,7 +2220,7 @@ int main(int argc, char **argv)
 	/***************************************************************************************/
 	
 	/*************************************************************************************
-    	 ____  ____  ____      ____   __   __    _  _  ____    ____  _  _   __  
+     ____  ____  ____      ____   __   __    _  _  ____    ____  _  _   __  
 	(  _ \(  _ \(  __)___ / ___) /  \ (  )  / )( \(  __)  (_  _)/ )( \ /  \ 
  	 ) __/ )   / ) _)(___)\___ \(  O )/ (_/\\ \/ / ) _)     )(  \ /\ /(  O )
 	(__)  (__\_)(____)    (____/ \__/ \____/ \__/ (____)   (__) (_/\_) \__/ 
@@ -1815,8 +2305,8 @@ int main(int argc, char **argv)
 	duration_presolve = (double)(finish_presolve - start_BB) / CLOCKS_PER_SEC;
   	printf("*******************\nTotal time spent until end of presolve phase 2: %lf\n************************\n",
 		  									duration_presolve);
-	fprintf(bb_results,"%lf\t",duration_presolve);
-	fprintf(bb_results,"%d\t",num_bounds_reduced);
+	if(!suppress_file_output) fprintf(bb_results,"%lf\t",duration_presolve);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_bounds_reduced);
 	
 	/************************************************************************************/
 	
@@ -2250,65 +2740,65 @@ int main(int argc, char **argv)
   	
   	printf("*******************\nTotal time: %lf\n************************\n",duration_BB);
   	printf("\nStructure time: %lf\t Which is %lf percent of BB time.\n************************\n",struct_time, struct_time/duration_BB*100.);
-  	fprintf(bb_results,"%lf\t",duration_BB);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",duration_BB);
   	printf("Number of BB nodes explored: %d\n", branch_iterations);
-  	fprintf(bb_results,"%d\t",branch_iterations);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",branch_iterations);
   	printf("Number of BB nodes at which local cuts were discovered: %d\n",found_local_cuts);
-  	fprintf(bb_results,"%d\t",found_local_cuts);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",found_local_cuts);
   	printf("Number of BB nodes at which branching occured on an objective space disjunction: %d\n",number_pareto_branches);
-  	fprintf(bb_results,"%d\t",number_pareto_branches);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",number_pareto_branches);
   	printf("Number of BB nodes at which a disjuntive cut was generated: %d\n",number_disj_cuts);
-  	fprintf(bb_results,"%d\t",number_disj_cuts);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",number_disj_cuts);
   	printf("Number of BB nodes at which mips were solved: %d\n",num_nodes_with_mips_solved);
-  	fprintf(bb_results,"%d\t",num_nodes_with_mips_solved);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_nodes_with_mips_solved);
   	printf("Number of BB nodes fathomed due to PSA completion: %d\n", fathomed_by_PSA_completion);
-  	fprintf(bb_results,"%d\t",fathomed_by_PSA_completion);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",fathomed_by_PSA_completion);
   	printf("Number of BB nodes fathomed due to dominated local ideal points: %d\n", fathomed_by_dominated_local_ideal_pts);
-  	fprintf(bb_results,"%d\t",fathomed_by_dominated_local_ideal_pts);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",fathomed_by_dominated_local_ideal_pts);
   	printf("Number of BB nodes fathomed due to dominated local ideal segments: %d\n", fathomed_by_dominated_local_ideal_segments);
-  	fprintf(bb_results,"%d\t",fathomed_by_dominated_local_ideal_segments);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",fathomed_by_dominated_local_ideal_segments);
   	printf("Number of BB nodes fathomed due to one dominated local ideal point and one dominated local ideal segment: %d\n", 
   											fathomed_by_1_dominated_pt_1_dominated_segment);
-  	fprintf(bb_results,"%d\t",fathomed_by_1_dominated_pt_1_dominated_segment);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",fathomed_by_1_dominated_pt_1_dominated_segment);
   	printf("Number of BB nodes fathomed due to dominated lower bound set: %d\n", fathomed_by_dominated_lb);
-  	fprintf(bb_results,"%d\t",fathomed_by_dominated_lb);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",fathomed_by_dominated_lb);
   	printf("\n");
   	printf("Total number of times a bound was reduced during branching: %d\n", bds_reduced);
-  	fprintf(bb_results,"%d\t",bds_reduced);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",bds_reduced);
   	printf("Number of times a bound was reduced during branching due to infeasibility: %d\n", bds_reduced_by_infeasibility);
-  	fprintf(bb_results,"%d\t",bds_reduced_by_infeasibility);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",bds_reduced_by_infeasibility);
   	printf("Number of times a bound was reduced during branching due to dominated local ideal point: %d\n", bds_reduced_by_dominated_ideal_pt);
-  	fprintf(bb_results,"%d\t",bds_reduced_by_dominated_ideal_pt);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",bds_reduced_by_dominated_ideal_pt);
   	printf("Number of times a bound was reduced during branching due to dominated local ideal segment: %d\n", bds_reduced_by_dominated_ideal_segment);
-  	fprintf(bb_results,"%d\t",bds_reduced_by_dominated_ideal_segment);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",bds_reduced_by_dominated_ideal_segment);
   	printf("Number of times a bound was reduced during branching due to dominated lower bound set: %d\n", bds_reduced_by_dominated_lb);
-  	fprintf(bb_results,"%d\t",bds_reduced_by_dominated_lb);
+  	if(!suppress_file_output) fprintf(bb_results,"%d\t",bds_reduced_by_dominated_lb);
   	
   	printf("\n\nSome Timing Results (Note that these are not mutually exclusive, for example, mips are solved DURING node processing)\n");
   	printf("Total time processing nodes: %lf ... Which makes for an average of %lf per node\n", time_processing_nodes, 
   		time_processing_nodes/branch_iterations);
-  	fprintf(bb_results,"%lf\t",time_processing_nodes);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",time_processing_nodes);
   	printf("Total time branching: %lf ... Which makes for an average of %lf per node\n", time_branching, 
   		time_branching/branch_iterations);
-  	fprintf(bb_results,"%lf\t",time_branching);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",time_branching);
   	printf("Total time tightening variable bounds: %lf ... Which makes for an average of %lf per node\n", time_tightening_variable_bounds, 
   		time_tightening_variable_bounds/branch_iterations);
-  	fprintf(bb_results,"%lf\t",time_tightening_variable_bounds);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",time_tightening_variable_bounds);
   	printf("Total time generating local cuts: %lf ... Which makes for an average of %lf per node at which cuts were found\n", time_generating_cuts, 
   		time_generating_cuts/found_local_cuts);
-  	fprintf(bb_results,"%lf\t",time_generating_cuts);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",time_generating_cuts);
   	printf("Total time generating disjunctive cuts: %lf ... Which makes for an average of %lf per node at which cuts were found\n",
   		time_generating_disjunction_cuts, time_generating_disjunction_cuts/number_disj_cuts);
-  	fprintf(bb_results,"%lf\t",time_generating_cuts);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",time_generating_cuts);
   	printf("Total time solving MIPs: %lf\n", time_solving_mips);
-  	fprintf(bb_results,"%lf\t",time_solving_mips);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",time_solving_mips);
   	
   	printf("\n\n_=_=_=_=_=_=_=_=\nMax Time to solve a MIP: %lf\n_=_=_=_=_=_=_=_=\n\n",max_time_to_solve_a_mip);
   	
-  	fprintf(bb_results,"%lf\t",longest_time);
-  	fprintf(bb_results,"%lf\t",prior_time+longest_time);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",longest_time);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",prior_time+longest_time);
   	
-  	fprintf(output2,"%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%d\t%d\t%d\t%d\n",duration_BB,insert_time,insert_time/duration_BB*100.,struct_time, struct_time/duration_BB*100.,insert_time2,insert_time2/duration_BB*100.,struct_time2, struct_time2/duration_BB*100.,branch_iterations,get_num_inserts(),get_num_nodes(tree),get_tree_depth(tree));
+  	if(!suppress_file_output && write_tree_results) fprintf(output2,"%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%d\t%d\t%d\t%d\n",duration_BB,insert_time,insert_time/duration_BB*100.,struct_time, struct_time/duration_BB*100.,insert_time2,insert_time2/duration_BB*100.,struct_time2, struct_time2/duration_BB*100.,branch_iterations,get_num_inserts(),get_num_nodes(tree),get_tree_depth(tree));
   	
   	/**********************Code for TERMINATE*************************/
   	
@@ -2337,7 +2827,7 @@ int main(int argc, char **argv)
 	double hd_dist = 0., percent_of_max_range = 0., length = 0., length_percent_of_max_range = 0.;
 	if(terminated_early && tree2)
 	{
-		fprintf(bb_results,"0\t");
+		if(!suppress_file_output) fprintf(bb_results,"0\t");
 		printf("*******************************************\n\n\n");
 /*		printf("Attempting to calculate Hausdorff distance between primal and dual bounds\n");*/
 		
@@ -2365,16 +2855,17 @@ int main(int argc, char **argv)
 		
 			printf("Hypervolume of primal bound: %lf\t Hypervolume of dual bound: %lf\t Gap: %lf  (%lf as a percent difference)\n\n",hy_v,
 				hy_v2,hy_v2-hy_v,pd);
-			fprintf(bb_results,"%lf\t%lf\t",hy_v2-hy_v,pd);
+			if(!suppress_file_output) fprintf(bb_results,"%lf\t%lf\t",hy_v2-hy_v,pd);
 			
 			printf("Overall length of dual bound is %lf which is %lf percent of the max range %lf\n",length,
 				length_percent_of_max_range,max_range);
-			fprintf(bb_results,"%lf\t%lf",length,length_percent_of_max_range);
+			if(!suppress_file_output) fprintf(bb_results,"%lf\t%lf",length,length_percent_of_max_range);
 	
 			if(print_Pareto) 
 			{
-				printf("\n*********************\n Global Dual bound: \n**********************\n\n\n");
-				print_inorder(tree2,2);
+				if(print_Pareto == 1) printf("\n*********************\n Global Dual bound: \n**********************\n\n\n");
+				else fprintf(pareto_results, "\n*********************\n Global Dual bound: \n**********************\n\n\n");
+				print_inorder(tree2,2,print_Pareto-1,pareto_results,matlab);
 			}
 			destroy_tree(tree2);
 		}
@@ -2390,33 +2881,35 @@ int main(int argc, char **argv)
 		
 			printf("Maximum proximal Hausdorff distance is %lf which is %lf percent of the max range %lf\n\n",hd_dist,
 				percent_of_max_range,max_range);
-			fprintf(bb_results,"%lf\t%lf\t",hd_dist,percent_of_max_range);
+			if(!suppress_file_output) fprintf(bb_results,"%lf\t%lf\t",hd_dist,percent_of_max_range);
 			
 			printf("Overall length of dual bound is %lf which is %lf percent of the max range %lf\n",length,
 				length_percent_of_max_range,max_range);
-			fprintf(bb_results,"%lf\t%lf",length,length_percent_of_max_range);
+			if(!suppress_file_output) fprintf(bb_results,"%lf\t%lf",length,length_percent_of_max_range);
 	
 			if(print_Pareto) 
-			{	
-				printf("\n*********************\n Global Dual bound: \n**********************\n\n\n");
-				print_inorder(tree2,2);
+			{
+				if(print_Pareto == 1) printf("\n*********************\n Global Dual bound: \n**********************\n\n\n");
+				else fprintf(pareto_results, "\n*********************\n Global Dual bound: \n**********************\n\n\n");
+				print_inorder(tree2,2,print_Pareto-1,pareto_results,matlab);
 			}
 			destroy_tree(tree2);
 		}
 		
 	}
-	else fprintf(bb_results,"1\t0.\t0.\t0.\t0.");
+	else if(!suppress_file_output) fprintf(bb_results,"1\t0.\t0.\t0.\t0.");
 	
 	if(!terminated_early) 
 	{
-		if(print_Pareto) printf("*******************\n Terminated Normally! Primal Solutions: \n************************\n");
+		if(print_Pareto == 1) printf("*******************\n Terminated Normally! Primal Solutions: \n************************\n");
 		else printf("*******************\n Terminated Normally! \n************************\n");
 	}
   	else 
   	{
-  		if(print_Pareto) printf("*******************\n Terminated Early! Primal Solutions: \n************************\n");
+  		if(print_Pareto == 1) printf("*******************\n Terminated Early! Primal Solutions: \n************************\n");
   		else printf("*******************\n Terminated Early! \n************************\n");
   	}
+  	if(print_Pareto == 2) fprintf(pareto_results, "*******************\n Primal Solutions: \n************************\n");
   	
   /*  	print_preorder (tree, output);*/
 	prev_node = NULL;
@@ -2427,7 +2920,7 @@ int main(int argc, char **argv)
 /*	printf("Total Number of Nodes: %d\n",get_num_nodes(tree));*/
 /*	printf("Final Depth of Tree: %d\n\n\n*******************\n",get_tree_depth(tree));*/
 	
-	if(print_Pareto) print_inorder(tree,1);
+	if(print_Pareto) print_inorder(tree,1,print_Pareto-1,pareto_results,matlab);
 	
 	destroy_tree (tree);
 	tree = NULL;
@@ -2444,12 +2937,12 @@ int main(int argc, char **argv)
 
 	/***************** Close Files ************************************/
 
-  	if (bb_results) 
+  	if (bb_results && !suppress_file_output) 
   	{
   		fprintf(bb_results,"\n");
   		fclose(bb_results);
   	}
-  	fclose(output2);
+  	if(!suppress_file_output && write_tree_results) fclose(output2);
 /*  	if (inserted_data) fclose(inserted_data);*/
 /*  	if (init_nadir) fclose(init_nadir);*/
   	/*  fclose(all_inserted);*/

@@ -1,4 +1,5 @@
 #ifndef BB_BICRITERIA_H
+#define BB_BICRITERIA_H
 
 /* Input problems should be available at testP1.lp and testP2.lp files */
 /* Only difference between two testP.lp files are the objective function coefficients */
@@ -231,6 +232,7 @@ extern int preprocessing_method, search_for_extra_solutions_during_preprocessing
 extern double percentage_of_integer_variables_to_check_for_probing_during_presolve, extreme_x, extreme_y;
 
 extern FILE *bb_results;
+extern FILE *pareto_results;
 
 extern clock_t start_struct_timer;
 extern clock_t finish_struct_timer;
@@ -280,8 +282,7 @@ int computefeassol (CPXENVptr  env,
 int parametricsimplex(CPXLPptr lp);
 double mini(double, double);
 
-static void
-free_and_null (char **ptr);
+static void free_and_null (char **ptr);
 
 
 struct pointSeg

@@ -2,12 +2,13 @@
 #include "presolve_preprocessing.h"
 #include "bb-bicriteria.h"
 #include "max_tree.h"
+#include "heuristics.h"
 
 int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1, int num_singleton_columns1, int num_singleton_columns2, 
 				double *obj_coef1, double *obj_coef2, CPXCLPptr redlp1, CPXCLPptr redlp2, CPXENVptr env, int *cmatbeg, int *row_indices, 
 				double *column_entries, int cur_numrows, CPXLPptr lp1, char *sense2, int fix_it, char *xctype, int *singleton_column_indices2,
 				int *their_rows1, int *their_rows2, char *sym, double l, double u, CPXLPptr lp2, int *singleton_column_indices1, int *col_indices,
-				double *row_entries, double *lower_bound, double *upper_bound)
+				double *row_entries, double *lower_bound, double *upper_bound, int suppress_file_output)
 {
 	clock_t phase1_st, phase1_fi;
 	double ti = 0.;
@@ -21,12 +22,15 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 			ti = (double)(phase1_fi - phase1_st) / CLOCKS_PER_SEC;
 			if(ti > max_phase1_time) 
 			{
-				fprintf(bb_results,"%d\t",num_fixed_phase1);
-				fprintf(bb_results,"%d\t",num_singleton_columns1+num_singleton_columns2);
-				fprintf(bb_results,"%d\t",num_singletons_fixed);
-				fprintf(bb_results,"%d\t",num_dom_cols);
-				fprintf(bb_results,"%d\t",num_dom_cols_tightened);
-				fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+				if(!suppress_file_output) 
+				{
+				    fprintf(bb_results,"%d\t",num_fixed_phase1);
+				    fprintf(bb_results,"%d\t",num_singleton_columns1+num_singleton_columns2);
+				    fprintf(bb_results,"%d\t",num_singletons_fixed);
+				    fprintf(bb_results,"%d\t",num_dom_cols);
+				    fprintf(bb_results,"%d\t",num_dom_cols_tightened);
+				    fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+				}
 			
 				printf("Phase 1 exceeded time limit of %lf. Moving on.\n",max_phase1_time);
 				goto END_OF_PHASE1;
@@ -147,14 +151,14 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 		}
 		printf("variables fixed due to duality fixing: %d\n",num_fixed_phase1);
 	}
-	fprintf(bb_results,"%d\t",num_fixed_phase1);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_fixed_phase1);
 	
 	/************************************************
 		Attempting to do singleton stuffing
 	************************************************/
 	
 	printf("Number of singleton columns: %d\n",num_singleton_columns1+num_singleton_columns2);
-	fprintf(bb_results,"%d\t",num_singleton_columns1+num_singleton_columns2);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_singleton_columns1+num_singleton_columns2);
 	if(singleton_columns && num_singleton_columns1)
 	{		
 /*			printf("Their indices:\n");*/
@@ -167,10 +171,13 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 			ti = (double)(phase1_fi - phase1_st) / CLOCKS_PER_SEC;
 			if(ti > max_phase1_time) 
 			{
-				fprintf(bb_results,"%d\t",num_singletons_fixed);
-				fprintf(bb_results,"%d\t",num_dom_cols);
-				fprintf(bb_results,"%d\t",num_dom_cols_tightened);
-				fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+			    if(!suppress_file_output) 
+			    {
+				    fprintf(bb_results,"%d\t",num_singletons_fixed);
+				    fprintf(bb_results,"%d\t",num_dom_cols);
+				    fprintf(bb_results,"%d\t",num_dom_cols_tightened);
+				    fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+				}
 			
 				printf("Phase 1 exceeded time limit of %lf. Moving on.\n",max_phase1_time);
 				goto END_OF_PHASE1;
@@ -348,10 +355,13 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 			ti = (double)(phase1_fi - phase1_st) / CLOCKS_PER_SEC;
 			if(ti > max_phase1_time) 
 			{
-				fprintf(bb_results,"%d\t",num_singletons_fixed);
-				fprintf(bb_results,"%d\t",num_dom_cols);
-				fprintf(bb_results,"%d\t",num_dom_cols_tightened);
-				fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+			    if(!suppress_file_output) 
+			    {
+				    fprintf(bb_results,"%d\t",num_singletons_fixed);
+				    fprintf(bb_results,"%d\t",num_dom_cols);
+				    fprintf(bb_results,"%d\t",num_dom_cols_tightened);
+				    fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+				}
 			
 				printf("Phase 1 exceeded time limit of %lf. Moving on.\n",max_phase1_time);
 				goto END_OF_PHASE1;
@@ -520,7 +530,7 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 /*			printf("Number of singleton columns which were fixed: %d\n",num_singletons_fixed);*/
 	}
 	printf("Number of singleton columns which were fixed: %d\n",num_singletons_fixed);
-	fprintf(bb_results,"%d\t",num_singletons_fixed);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_singletons_fixed);
 /*		exit(0);*/
 	
 	/************************************************
@@ -542,9 +552,12 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 			ti = (double)(phase1_fi - phase1_st) / CLOCKS_PER_SEC;
 			if(ti > max_phase1_time) 
 			{
-				fprintf(bb_results,"%d\t",num_dom_cols);
-				fprintf(bb_results,"%d\t",num_dom_cols_tightened);
-				fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+			    if(!suppress_file_output) 
+			    {
+				    fprintf(bb_results,"%d\t",num_dom_cols);
+				    fprintf(bb_results,"%d\t",num_dom_cols_tightened);
+				    fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+				}
 			
 				printf("Phase 1 exceeded time limit of %lf. Moving on.\n",max_phase1_time);
 				goto END_OF_PHASE1;
@@ -1079,11 +1092,11 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 		}
 	}
 	printf("Number of times one column dominated another: %d\n",num_dom_cols);
-	fprintf(bb_results,"%d\t",num_dom_cols);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_dom_cols);
 	printf("Number of times a variable bound was tightened due to dominance: %d\n",num_dom_cols_tightened);
-	fprintf(bb_results,"%d\t",num_dom_cols_tightened);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_dom_cols_tightened);
 	printf("Number of variables fixed due to dominated columns: %d\n",num_dom_cols_fixed);
-	fprintf(bb_results,"%d\t",num_dom_cols_fixed);
+	if(!suppress_file_output) fprintf(bb_results,"%d\t",num_dom_cols_fixed);
 	
 /*		for(i=0;i<num_dom_cols;i++) printf("col %d dominates col %d\n",dominating_indices[i],dominated_indices[i]);*/
 /*		*/
@@ -1096,7 +1109,7 @@ int run_presolve_phase1	(int cur_numcols, FILE *bb_results, int num_fixed_phase1
 
 int epsilon_constraint_preprocessing(int yet_another_preprocessing_algorithm, clock_t start_presolve, CPXCENVptr env, CPXLPptr lp1, int *indices, 
 					double *obj_coef2, double *ub, double *lb, int cur_numcols, CPXLPptr lp2, double split_pt_denom2, clock_t finish_presolve,
-					double preprocessing_time, double duration_presolve, FILE *bb_results, int num_mips_to_solve, int numsols)
+					double preprocessing_time, double duration_presolve, FILE *bb_results, int num_mips_to_solve, int numsols, int suppress_file_output)
 {
 	int status = 0, i = 0, j = 0;
 	exact_mips = 1;
@@ -1413,7 +1426,7 @@ int epsilon_constraint_preprocessing(int yet_another_preprocessing_algorithm, cl
   		printf("*******************\n");
   		printf("Prepopulate time: (Alone) %lf\t (Cumulative) %lf\nIterations: %d, MIPs solved: %d Num sols added from heur: %d\n",
   									duration_presolve,duration_BB,presolve_iteration,mips_solved,run_it);
-  		fprintf(bb_results,"%lf\t",duration_BB);
+  		if(!suppress_file_output) fprintf(bb_results,"%lf\t",duration_BB);
   		printf("*******************\n");
   		
 	  	if(x) free_and_null ((char **) &x);
@@ -1675,6 +1688,8 @@ int epsilon_constraint_preprocessing(int yet_another_preprocessing_algorithm, cl
 			status = CPXaddmipstarts (env_just_solve_mips, presolve_lp, num_starts, nzcnt, global_beg, global_varindices,
 					   global_values, global_effortlevel, NULL);
 
+            status = CPXwriteprob (env_just_solve_mips, presolve_lp, "myprob.lp", "LP");
+/*            exit(0);*/
 			CPXmipopt (env_just_solve_mips, presolve_lp);
 			
 			numsolns = CPXgetsolnpoolnumsolns (env_just_solve_mips, presolve_lp);
@@ -1877,7 +1892,7 @@ int epsilon_constraint_preprocessing(int yet_another_preprocessing_algorithm, cl
   		printf("*******************\n");
   		printf("Prepopulate time: (Alone) %lf\t (Cumulative) %lf\nIterations: %d, MIPs solved: %d Num sols added from heur: %d\n",
   									duration_presolve,duration_BB,presolve_iteration,mips_solved,run_it);
-  		fprintf(bb_results,"%lf\t",duration_BB);
+  		if(!suppress_file_output) fprintf(bb_results,"%lf\t",duration_BB);
   		printf("*******************\n");
   		
 	  	if(x) free_and_null ((char **) &x);
@@ -1892,7 +1907,7 @@ int epsilon_constraint_preprocessing(int yet_another_preprocessing_algorithm, cl
 
 int weighted_sum_preprocessing(clock_t start_presolve, CPXLPptr lp1, CPXLPptr lp2, CPXENVptr env, int cur_numcols, int cur_numrows, int *indices, 
 				double *obj_coef2, int intervals, int run_it, double split_pt_denom, clock_t finish_presolve, double preprocessing_time, 
-				double duration_presolve, FILE *bb_results, double *obj_coef1)
+				double duration_presolve, FILE *bb_results, double *obj_coef1, int suppress_file_output)
 {
 	start_presolve = clock();
 	int num_slopes = 0, status = 0, nzcnt = 0, surplus = 0, status2 = 0, i = 0;
@@ -2952,7 +2967,7 @@ int weighted_sum_preprocessing(clock_t start_presolve, CPXLPptr lp1, CPXLPptr lp
   	printf("*******************\n");
   	printf("Prepopulate time: (Alone) %lf\t (Cumulative) %lf\nIterations: %d, MIPs solved: %d Num sols added from heur: %d\n",
   									duration_presolve,duration_BB,presolve_iteration,mips_solved,run_it);
-  	fprintf(bb_results,"%lf\t",duration_BB);
+  	if(!suppress_file_output) fprintf(bb_results,"%lf\t",duration_BB);
   	printf("*******************\n");
   	
   	if(x) free_and_null ((char **) &x);

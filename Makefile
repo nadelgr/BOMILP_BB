@@ -2,7 +2,7 @@
 # Set these two directories
 #
 
-HOMEBIN=${HOME}/Desktop/tree_version
+HOMEBIN=${HOME}/Dropbox\ \(Edinboro\ University\)/Edinboro/Research/github_bb/BOMILP_BB
 CPLEX_DIR=$(HOME)/ILOG/CPLEX_Studio126/cplex
 
 CC=gcc
@@ -13,11 +13,11 @@ CC=gcc
 
 SOLSTRUCT=tree
 
-LDFLAGS= -O3 -L$(CPLEX_DIR)/lib/x86-64_linux/static_pic -lcplex -lpthread -lm
-CFLAGS=  -O3 -I$(CPLEX_DIR)/include/ilcplex
+LDFLAGS= -O3 -g -L$(CPLEX_DIR)/lib/x86-64_linux/static_pic -lcplex -lpthread -lm -fno-stack-protector
+CFLAGS=  -O3 -g -I$(CPLEX_DIR)/include/ilcplex -fno-stack-protector
 
-OBJ = max_$(SOLSTRUCT).o callbacks.o presolve_preprocessing.o biobjective_bb.o 
-HEADER = user_set_parameters.h max_$(SOLSTRUCT).h callbacks.h presolve_preprocessing.h bb-bicriteria.h biobjective_bb.h 
+OBJ = heuristics.o minor_functions.o max_$(SOLSTRUCT).o callbacks.o presolve_preprocessing.o biobjective_bb.o 
+HEADER = heuristics.h minor_functions.h user_set_parameters.h max_$(SOLSTRUCT).h callbacks.h presolve_preprocessing.h bb-bicriteria.h biobjective_bb.h 
 
 all: ${HOMEBIN}/bb_solver
 
@@ -25,7 +25,7 @@ clean:
 	@rm *.o
 	@[ -f ${HOMEBIN}/bb_solver ] 
 
-${HOMEBIN}/bb_solver_time: $(OBJ) Makefile $(HEADER)
+${HOMEBIN}/bb_solver: $(OBJ) Makefile $(HEADER)
 	@echo Linking $(@F)
 	@$(CC) -DSOL_$(SOLSTRUCT) -o ${HOMEBIN}/bb_solver $(OBJ) $(LDFLAGS)
 

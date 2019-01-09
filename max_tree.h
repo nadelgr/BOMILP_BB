@@ -80,6 +80,9 @@ struct user_data
 
 typedef struct user_data user_data;
 
+int min(int x, int y);
+int max(int x, int y);
+
 node *find_right_leaf(node *leaf);
 node *find_left_leaf(node *leaf);
 node *find_rightmost_leaf(node *leaf);
@@ -105,12 +108,18 @@ double get_length(node *n1, double val);
 int find_separations(node *n1, int starting);
 node *copy_tree(struct node *current, struct node *parent);
 double get_hypervolume(node *n1, int starting, double current_val);
+void print_inorder(node *n1, int color, int print_to_file, FILE *pareto_results, int matlab_style);
+void destroy_tree(struct node *leaf);
+int get_num_inserts();
+int get_num_nodes(node *leaf);
+int get_tree_depth(node *leaf);
 
 /**************** Added for use with Chebychev branching strategy 10/15/14 ********************/
 
 double *find_leaf_in_bounds(double x_lb,double x_ub,double y_lb,double y_ub,node *cur_node);
 int semi_mock_insert(int type, double nw_x, double nw_y, double se_x, double se_y, double slope, struct node **leaf);
 int mock_insert(int type, double nw_x, double nw_y, double se_x, double se_y, double slope, struct node **leaf);
+int mock_insert2(int type, double nw_x, double nw_y, double se_x, double se_y, double slope, struct node **leaf);
 
 extern node *prev_node;
 

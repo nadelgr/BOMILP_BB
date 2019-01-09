@@ -7,15 +7,12 @@ To run the software, open a terminal, change the working directory to the folder
 			      the feasible set of the biobjective problem.
 (2) Path to input LP file 2 - This file MUST be an LP file whose objective function is the function to be considered as objective 2 for the biobjective problem and
 			      whose feasible set is the feasible set of the biobjective problem. **IMPORTANT NOTE** -- This software will NOT FUNCTION CORRECTLY if
-		              corresponding vairables in "file 1" and "file 2" do not appear for the first time in the same order.
-(3) Binary flag		    - This flag should be set to 1 if you desire to see the Pareto set displayed in the standard out after termination of BB. Otherwise, it 
-			      should be set to 0. Note that if the Pareto set is displayed it will be pre-formatted so that it can be copied and pasted into the
-			      MATLAB file "display_Pareto.m" (included), which creates a plot of these solutions.
-(4) Name of output file     - This argument is OPTIONAL and allows the user to specify the name of the output file, which is described in the README file. If this
-			      argument is omitted, the output file will receive the default name "bb_results.txt".
+		          corresponding vairables in "file 1" and "file 2" do not appear for the first time in the same order.
+(3) Additional commands (optional) - For a list of optional command line flags, see README.txt.
 
-Examples of running the software with optional 4th argument: "./bb_solver testp1.lp testp2.lp 0 results.txt"
-							     "./bb_solver /path_to_instances/testp1.lp /path_to_instances/testp2.lp 0 results.txt"
-Example of running the software without optional 4th argument:  "./bb_solver testp1.lp testp2.lp 1"
+Examples of running the software with no additional flags:  "./bb_solver testp1.lp testp2.lp"
+							                                "./bb_solver /path_to_instances/testp1.lp /path_to_instances/testp2.lp"
+Examples of running the software with additional flags:     "./bb_solver testp1.lp testp2.lp -showProgress T -showFreq 10 -hausHyper A -out foo.txt -print T -matlab F"
+                                                            "./bb_solver testp1.lp testp2.lp -showProgress T -showFreq 100 -out none -print bar.txt -matlab T"
 
 **Note that this software will NOT work properly without use of the third party software CPLEX, available from IBM.

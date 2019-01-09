@@ -1,3 +1,6 @@
+#ifndef CALLBACKS
+#define CALLBACKS
+
 /* File created by Nathan Adelgren, Graduate Assisistant at Clemson University.
 Started: 9/28/2014 
 Finished: N/A
@@ -9,6 +12,7 @@ Finished: N/A
 #include<time.h>
 
 #include "cplex.h"
+#include "max_tree.h"
 
 //FILE *inserted_data = NULL;
 
@@ -231,3 +235,24 @@ usersetbranch3 (CPXCENVptr   env,
                const double *bd,
                const double *nodeest,
                int          *useraction_p);    
+               
+int PSA_reduce_right(CPXCENVptr env, CPXLPptr prob, double *x_orig, int *basis_col_info_orig, int *basis_row_info_orig, int *indices, int snum);
+int PSA_reduce_left(CPXCENVptr env, CPXLPptr prob, double *x_orig, int *basis_col_info_orig, int *basis_row_info_orig, int *indices);
+void PSA_full(CPXCENVptr env, CPXLPptr prob, double *x_orig, int *basis_col_info_orig, int *basis_row_info_orig);
+void provide_coefs(double *coef1, double *coef2, int num_cols);
+void provide_xctype(CPXENVptr env, char *types, int num_cols);
+void build_dual_bd_approximately(CPXCENVptr env, CPXLPptr prob1, double slp, int *indices);
+void build_dual_bd(CPXCENVptr env, CPXLPptr prob);
+void free_probs();
+
+extern CPXLPptr lp_1;
+extern CPXLPptr lp_2;
+extern int num_integer;
+extern int num_stored;
+extern double **stored_x;
+extern int *integer_indices;
+extern double *ob_coef1;
+extern double *ob_coef2;
+extern double *weighted_coefs;
+
+#endif

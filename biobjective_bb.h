@@ -1,3 +1,6 @@
+#ifndef BIOBJECTIVE_BB
+#define BIOBJECTIVE_BB
+
 /* File created by Nathan Adelgren, Graduate Assisistant at Clemson University.
 Started: 9/3/2014 
 Finished: N/A
@@ -14,9 +17,16 @@ code authored by Drs. Banu Soylu and Pietro Belotti. I collaborated on this work
 #include <signal.h>
 #include <time.h>
 #include <pthread.h>
+#include "presolve_preprocessing.h"
 
 extern int exact_mips;
 extern double time_limit;
+extern CPXLPptr   lp2;
+extern double obj1_extra_val;
+extern double obj2_extra_val;
+extern int heur_limit;
+extern int num_x_to_store;
+extern int obj1_index;
 
 struct split_pt //Points used for "objective branching"
 {
@@ -69,3 +79,7 @@ struct store_it
 };
 
 //void add_binary_cut(CPXCENVptr env, CPXLPptr prob1, CPXLPptr prob2, double *x, int *indices, double *coefs);
+void chg_coefs_(CPXCENVptr env, CPXLPptr prob, int *indices, double slope);
+int add_interval(double val, interval *intrvl, int count);
+
+#endif

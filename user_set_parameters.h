@@ -160,7 +160,7 @@ int time_vs_node_lim = 0; // If set to 0 single objective MIPs will be solved fo
 			  
 int keep_solving_infeasible_MIPs = 0; // If set to 1, MIPs which return the status "time limit infeasible" will continue to be solved until this status changes,
 				      // even if the time "time_limit" is exceeded. If set to 0, the MIP will cease to be processed after "time_limit" seconds. The
-				      // motivation for ssetting this parameter to 1 is that if the MIP being considered is truly infeasible, the MIPs at every 
+				      // motivation for setting this parameter to 1 is that if the MIP being considered is truly infeasible, the MIPs at every 
 				      // child node will also be infeasible. Thus, it is likely that we recieve the "time limit infeasible" at every child node
 				      // until the associated subproblem becomes easy enough to show that the MIP is infeasible within "time_limit." Hence,
 				      // allowing the initial MIP to run until infeasibility is proved can significantly reduce overall BB time.
