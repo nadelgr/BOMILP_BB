@@ -60,8 +60,8 @@ Notes:
 	Thus, the file is designed to have its contents copied and pasted into a spreadsheet so that multiple instances can 
 	be compared.
 	
-	_______________________________________________________________________________________________________________________________________________
 	
+	___________________________________________________________________________________________________________________
 	Command Line Flags: 
 	
     1) -presolve1       Values: T - Presolve phase 1 is turned on
