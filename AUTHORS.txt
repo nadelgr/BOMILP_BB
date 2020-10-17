@@ -1,4 +1,4 @@
-All files associated with this branch-and-bound solver for biobjective mixed-integer linear programs have been written primarily by Nathan Adelgren during his time as graduate student at Clemson University (2014-2016), under the advisement of Akshay Gupte.
+All files associated with this branch-and-bound solver for biobjective mixed-integer linear programs have been written primarily by Nathan Adelgren during his time as a graduate student at Clemson University (2014-2016), under the advisement of Akshay Gupte.
 
 A variety of small updates have been made by Nathan Adelgren since 2016.
 
