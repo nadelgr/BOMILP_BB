@@ -31,7 +31,7 @@ Notes:
 	5) Number of bounds tightened using a dominated column
 	6) Number of dominated columns fixed	
 	7) Presolve Phase 1 time
-    8) Total time spent solving firt two single objective MIPs (having objectives 1 and 2)	
+        8) Total time spent solving firt two single objective MIPs (having objectives 1 and 2)	
 	9) Prepopulate time
 	10) Presolve Phase 2 time
 	11) Number of variable bounds tightened during ph2	
