@@ -1,4 +1,17 @@
-For instructions on compiling this software and to see examples of how to run the software from the terminal, see the INSTALL.txt file.
+To run the software, open a terminal, change the working directory to the folder containing this file, and type "./bb_solver" followed by these arguments:
+
+(1) Path to input LP file 1 - This file MUST be an LP file (http://www.ibm.com/support/knowledgecenter/SS9UKU_12.4.0/com.ibm.cplex.zos.help/FileFormats/topics/LP.html) whose objective function is the function to be considered as objective 1 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem.
+(2) Path to input LP file 2 - This file MUST be an LP file whose objective function is the function to be considered as objective 2 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem. **IMPORTANT NOTE** -- This software will NOT FUNCTION CORRECTLY if corresponding vairables in "file 1" and "file 2" do not appear for the first time in the same order.
+(3) Additional commands (optional) - A list of optional command line flags is included at the bottom of this file.
+
+Examples of running the software with no additional flags:  "./bb_solver testp1.lp testp2.lp"
+							                                "./bb_solver /path_to_instances/testp1.lp /path_to_instances/testp2.lp"
+Examples of running the software with additional flags:     "./bb_solver testp1.lp testp2.lp -showProgress T -showFreq 10 -hausHyper A -out foo.txt -print T -matlab F"
+                                                            "./bb_solver testp1.lp testp2.lp -showProgress T -showFreq 100 -out none -print bar.txt -matlab T"
+
+**Note that this software will NOT work properly without use of the third party software CPLEX, available from IBM.
+
+
 
 Notes:
 
@@ -17,43 +30,44 @@ Notes:
 	4) Number of pairs of dominating columns discovered
 	5) Number of bounds tightened using a dominated column
 	6) Number of dominated columns fixed	
-	7) Presolve Phase 1 time	
-	8) Prepopulate time
-	9) Presolve Phase 2 time
-	10) Number of variable bounds tightened during ph2	
-	11) Total BB time	
-	12) Number of BB nodes explored
-	13) Number of nodes at which local cuts were added
-	14) Number of times branching was performed on an objective space disjunction
-	15) Number of times a disjunctive cut was generated using an objective space disjucntion
-	16) Number of MIPs solved during BB
-	17) Number of BB nodes fathomed by PSA running to completion while maintaining integer-feasibility
-	18) Number of BB nodes fathomed because the ideal point(s) of (subsets of) the dual bound was dominated
-	19) Number of BB nodes fathomed because the ideal segment of the dual bound was dominated
-	20) Number of BB nodes fathomed because the ideal point of a subset of the dual bound was dominated and the ideal
+	7) Presolve Phase 1 time
+    8) Total time spent solving firt two single objective MIPs (having objectives 1 and 2)	
+	9) Prepopulate time
+	10) Presolve Phase 2 time
+	11) Number of variable bounds tightened during ph2	
+	12) Total BB time	
+	13) Number of BB nodes explored
+	14) Number of nodes at which local cuts were added
+	15) Number of times branching was performed on an objective space disjunction
+	16) Number of times a disjunctive cut was generated using an objective space disjucntion
+	17) Number of MIPs solved during BB
+	18) Number of BB nodes fathomed by PSA running to completion while maintaining integer-feasibility
+	19) Number of BB nodes fathomed because the ideal point(s) of (subsets of) the dual bound was dominated
+	20) Number of BB nodes fathomed because the ideal segment of the dual bound was dominated
+	21) Number of BB nodes fathomed because the ideal point of a subset of the dual bound was dominated and the ideal
 	    segment of the remainder of the dual bound was also dominated
-	21) Number of BB nodes fathomed after each segment of the dual bound was generated, and each was dominated
-	22) Number of variable bounds tightened during entire BB using probing before branching 
-	23) Number of variable bounds tightened during probing due to infeasibility
-	24) Number of variable bounds tightened during probing due to a dominated ideal point
-	25) Number of variable bounds tightened during probing due to a dominated ideal segment
-	26) Number of variable bounds tightened during probing due to a dominated lower bound set
-	27) Total time spent in node processing function during BB
-	28) Total time spent in user selected branching function during BB
-	29) Total time spent probing during BB
-	30) Total time spent generating local cuts during BB
-	31) Total time spent generating disjcuntive cuts during BB 
-	32) Total time spent solving MIPs during BB
-	33) Maximum time spent running BB on a subset of the objective space when objective space splitting is employed
-	34) Item (33) + Preprocessing/Presolve time (this should be approximately the time to run BB in parallel over each
+	22) Number of BB nodes fathomed after each segment of the dual bound was generated, and each was dominated
+	23) Number of variable bounds tightened during entire BB using probing before branching 
+	24) Number of variable bounds tightened during probing due to infeasibility
+	25) Number of variable bounds tightened during probing due to a dominated ideal point
+	26) Number of variable bounds tightened during probing due to a dominated ideal segment
+	27) Number of variable bounds tightened during probing due to a dominated lower bound set
+	28) Total time spent in node processing function during BB
+	29) Total time spent in user selected branching function during BB
+	30) Total time spent probing during BB
+	31) Total time spent generating local cuts during BB
+	32) Total time spent generating disjcuntive cuts during BB 
+	33) Total time spent solving MIPs during BB
+	34) Maximum time spent running BB on a subset of the objective space when objective space splitting is employed
+	35) Item (33) + Preprocessing/Presolve time (this should be approximately the time to run BB in parallel over each
 	    subset when exploiting objective space gaps)
-	35) Binary indicator of whether or not BB completely generated the Pareto set
-	36) Total time spent until the start of duality gap calculation
-	37) Number of open nodes at start of duality gap calculation
-	38) Duality gap
-	39) Duality gap - as a percent
-	40) Length of nondominated subset of the dual bound
-	41) Length of nondominated subset of the dual bound - measured as a percentage of the max of the f1-range and 
+	36) Binary indicator of whether or not BB completely generated the Pareto set
+	37) Total time spent until the start of duality gap calculation
+	38) Number of open nodes at start of duality gap calculation
+	39) Duality gap
+	40) Duality gap - as a percent
+	41) Length of nondominated subset of the dual bound
+	42) Length of nondominated subset of the dual bound - measured as a percentage of the max of the f1-range and 
 	    f2-range in the objective space
 	
 	This file is written in "append" format, i.e., its contents are not overwritten each time a new instance is run. 
@@ -200,7 +214,7 @@ Notes:
                                     and so showing progress can cause a significant increase in overall solution time.
                                 F - Progress is not reported until BB terminates. (default)
     
-    27) -ShowFreq       Values: positive integers - The number of nodes that should be processed in between each progress 
+    27) -showFreq       Values: positive integers - The number of nodes that should be processed in between each progress 
                                                     report. Note that this value has no effect unless -showProgress = T. 
                                                     (default value - 5)
     
@@ -276,7 +290,7 @@ Notes:
     43) -mipTime        Values: positive reals -    The maximum time to spend on each single objective MIP solve during BB 
                                                     (in seconds). (default value - 60)
     
-    44) -bbNodes        Values: positive integers - The maximum number of nodes to process for each single objective MIP 
+    44) -mipNode        Values: positive integers - The maximum number of nodes to process for each single objective MIP 
                                                     solved during BB. (default value - 1000000000)
     
     45) -presolve1time  Values: positive reals -    The maximum amount of time to spend in presolve phase 1 (in seconds). 
@@ -291,7 +305,8 @@ Notes:
     48) -ppTime         Values: positive reals -    The maximum amount of time to spend in preprocessing (in seconds). 
                                                     (default value - 1800)
     
-    49) -dualGapLimit   Values: positive reals -    BB is terminated when the dual gap falls below its value. Note that 
+    49) -dualGapLimit   Values: positive reals -    BB is terminated when the dual gap falls below its value. This value
+    												indicates a percentage and should be on the scale 0-100. Note that 
                                                     unlike single objective MIP, dual information is not readily available 
                                                     and must be constructed in order to be utilized. This information is 
                                                     NOT generated unless -showProgress = T. Therefore, unless -
