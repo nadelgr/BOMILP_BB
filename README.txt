@@ -1,11 +1,11 @@
 To run the software, open a terminal, change the working directory to the folder containing this file, and type "./bb_solver" followed by these arguments:
 
 (1) Path to input LP file 1 - This file MUST be an LP file (http://www.ibm.com/support/knowledgecenter/SS9UKU_12.4.0/com.ibm.cplex.zos.help/FileFormats/topics/LP.html) whose objective function is the function to be considered as objective 1 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem.
-(2) Path to input LP file 2 - This file MUST be an LP file whose objective function is the function to be considered as objective 2 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem. **IMPORTANT NOTE** -- This software will NOT FUNCTION CORRECTLY if corresponding vairables in "file 1" and "file 2" do not appear for the first time in the same order.
+(2) Path to input LP file 2 - This file MUST be an LP file whose objective function is the function to be considered as objective 2 for the biobjective problem and whose feasible set is the feasible set of the biobjective problem. **IMPORTANT NOTE** -- This software will NOT FUNCTION CORRECTLY if corresponding variables in "file 1" and "file 2" do not appear for the first time in the same order.
 (3) Additional commands (optional) - A list of optional command line flags is included at the bottom of this file.
 
 Examples of running the software with no additional flags:  "./bb_solver testp1.lp testp2.lp"
-							                                "./bb_solver /path_to_instances/testp1.lp /path_to_instances/testp2.lp"
+                                                            "./bb_solver /path_to_instances/testp1.lp /path_to_instances/testp2.lp"
 Examples of running the software with additional flags:     "./bb_solver testp1.lp testp2.lp -showProgress T -showFreq 10 -hausHyper A -out foo.txt -print T -matlab F"
                                                             "./bb_solver testp1.lp testp2.lp -showProgress T -showFreq 100 -out none -print bar.txt -matlab T"
 
@@ -19,65 +19,65 @@ Notes:
                         for a list of such flags and their possible values.
     
 (2) Output files: Running this software will produce two outputs:
-	(a) The standard out displays human-readable updates throughout the execution of the software as well as a detailed 
-	    summary of the results after termination.
-	(b) If desired, a secondary output file is created (which can be named by the user using the appropriate command
-	    line flags). This file contains the following information, tab delimited:
-	
-	1) Number of variables fixed by duality fixing
-	2) Number of singleton columns discovered	
-	3) Number of singleton columns fixed	
-	4) Number of pairs of dominating columns discovered
-	5) Number of bounds tightened using a dominated column
-	6) Number of dominated columns fixed	
-	7) Presolve Phase 1 time
-    8) Total time spent solving firt two single objective MIPs (having objectives 1 and 2)	
-	9) Prepopulate time
-	10) Presolve Phase 2 time
-	11) Number of variable bounds tightened during ph2	
-	12) Total BB time	
-	13) Number of BB nodes explored
-	14) Number of nodes at which local cuts were added
-	15) Number of times branching was performed on an objective space disjunction
-	16) Number of times a disjunctive cut was generated using an objective space disjucntion
-	17) Number of MIPs solved during BB
-	18) Number of BB nodes fathomed by PSA running to completion while maintaining integer-feasibility
-	19) Number of BB nodes fathomed because the ideal point(s) of (subsets of) the dual bound was dominated
-	20) Number of BB nodes fathomed because the ideal segment of the dual bound was dominated
-	21) Number of BB nodes fathomed because the ideal point of a subset of the dual bound was dominated and the ideal
-	    segment of the remainder of the dual bound was also dominated
-	22) Number of BB nodes fathomed after each segment of the dual bound was generated, and each was dominated
-	23) Number of variable bounds tightened during entire BB using probing before branching 
-	24) Number of variable bounds tightened during probing due to infeasibility
-	25) Number of variable bounds tightened during probing due to a dominated ideal point
-	26) Number of variable bounds tightened during probing due to a dominated ideal segment
-	27) Number of variable bounds tightened during probing due to a dominated lower bound set
-	28) Total time spent in node processing function during BB
-	29) Total time spent in user selected branching function during BB
-	30) Total time spent probing during BB
-	31) Total time spent generating local cuts during BB
-	32) Total time spent generating disjcuntive cuts during BB 
-	33) Total time spent solving MIPs during BB
-	34) Maximum time spent running BB on a subset of the objective space when objective space splitting is employed
-	35) Item (33) + Preprocessing/Presolve time (this should be approximately the time to run BB in parallel over each
-	    subset when exploiting objective space gaps)
-	36) Binary indicator of whether or not BB completely generated the Pareto set
-	37) Total time spent until the start of duality gap calculation
-	38) Number of open nodes at start of duality gap calculation
-	39) Duality gap
-	40) Duality gap - as a percent
-	41) Length of nondominated subset of the dual bound
-	42) Length of nondominated subset of the dual bound - measured as a percentage of the max of the f1-range and 
-	    f2-range in the objective space
-	
-	This file is written in "append" format, i.e., its contents are not overwritten each time a new instance is run. 
-	Thus, the file is designed to have its contents copied and pasted into a spreadsheet so that multiple instances can 
-	be compared.
-	
-	
-	___________________________________________________________________________________________________________________
-	Command Line Flags: 
-	
+    (a) The standard out displays human-readable updates throughout the execution of the software as well as a detailed 
+        summary of the results after termination.
+    (b) If desired, a secondary output file is created (which can be named by the user using the appropriate command
+        line flags). This file contains the following information, tab delimited:
+    
+    1) Number of variables fixed by duality fixing
+    2) Number of singleton columns discovered    
+    3) Number of singleton columns fixed    
+    4) Number of pairs of dominating columns discovered
+    5) Number of bounds tightened using a dominated column
+    6) Number of dominated columns fixed    
+    7) Presolve Phase 1 time
+    8) Total time spent solving first two single objective MIPs (having objectives 1 and 2)    
+    9) Prepopulate time
+    10) Presolve Phase 2 time
+    11) Number of variable bounds tightened during ph2    
+    12) Total BB time    
+    13) Number of BB nodes explored
+    14) Number of nodes at which local cuts were added
+    15) Number of times branching was performed on an objective space disjunction
+    16) Number of times a disjunctive cut was generated using an objective space disjunction
+    17) Number of MIPs solved during BB
+    18) Number of BB nodes fathomed by PSA running to completion while maintaining integer-feasibility
+    19) Number of BB nodes fathomed because the ideal point(s) of (subsets of) the dual bound was dominated
+    20) Number of BB nodes fathomed because the ideal segment of the dual bound was dominated
+    21) Number of BB nodes fathomed because the ideal point of a subset of the dual bound was dominated and the ideal
+        segment of the remainder of the dual bound was also dominated
+    22) Number of BB nodes fathomed after each segment of the dual bound was generated, and each was dominated
+    23) Number of variable bounds tightened during entire BB using probing before branching 
+    24) Number of variable bounds tightened during probing due to infeasibility
+    25) Number of variable bounds tightened during probing due to a dominated ideal point
+    26) Number of variable bounds tightened during probing due to a dominated ideal segment
+    27) Number of variable bounds tightened during probing due to a dominated lower bound set
+    28) Total time spent in node processing function during BB
+    29) Total time spent in user selected branching function during BB
+    30) Total time spent probing during BB
+    31) Total time spent generating local cuts during BB
+    32) Total time spent generating disjunctive cuts during BB 
+    33) Total time spent solving MIPs during BB
+    34) Maximum time spent running BB on a subset of the objective space when objective space splitting is employed
+    35) Item (33) + Preprocessing/Presolve time (this should be approximately the time to run BB in parallel over each
+        subset when exploiting objective space gaps)
+    36) Binary indicator of whether or not BB completely generated the Pareto set
+    37) Total time spent until the start of duality gap calculation
+    38) Number of open nodes at start of duality gap calculation
+    39) Duality gap
+    40) Duality gap - as a percent
+    41) Length of nondominated subset of the dual bound
+    42) Length of nondominated subset of the dual bound - measured as a percentage of the max of the f1-range and 
+        f2-range in the objective space
+    
+    This file is written in "append" format, i.e., its contents are not overwritten each time a new instance is run. 
+    Thus, the file is designed to have its contents copied and pasted into a spreadsheet so that multiple instances can 
+    be compared.
+    
+    
+    ___________________________________________________________________________________________________________________
+    Command Line Flags: 
+    
     1) -presolve1       Values: T - Presolve phase 1 is turned on
                                 F - Presolve phase 1 is turned off (default)
                                 
@@ -96,10 +96,10 @@ Notes:
                                                         value is coded into BOTH the epsilon-constraint and weighted-sum 
                                                         approaches and will therefore impact whichever procedure is 
                                                         indicated above. (default value - 1)
-				                                        
+                                                        
     5) -ppExtra         Values: T - Utilize CPLEX's populate command instead of its mipopt command. This can help find
-	                                extra solutions during preprocessing for difficult problems, but it can also add 
-	                                significant time.
+                                    extra solutions during preprocessing for difficult problems, but it can also add 
+                                    significant time.
                                 F - Use mipopt (default)
                                 
     6) -ppCuts          Values: T - Each time a weighted sum problem is solved during preprocessing a local cut will be 
@@ -113,9 +113,9 @@ Notes:
                                                         called after each iteration of preprocessing in order to try to 
                                                         determine additional nondominated integer feasible solutions not 
                                                         discovered during preprocessing. (default value - 0)
-							                            
+                                                        
     8) -presolve2       Values: T - Presolve phase 2 is turned on. Note that presolve phase 2 cannot be turned on if 
-	                                preprocessing is turned off.
+                                    preprocessing is turned off.
                                 F - Presolve phase 2 is turned off (default)
                                 
     9) -osFathom        Values: T - Turn on objective space fathoming (a.k.a. Pareto branching). (default)
@@ -274,7 +274,7 @@ Notes:
                                     be solved until this status changes, even if the time -mipTime is exceeded. The 
                                     motivation for enabling this feature is that if the MIP being considered is truly 
                                     infeasible, the MIPs at every child node will also be infeasible. Thus, it is likely 
-                                    that we recieve the "time limit infeasible" at every child node until the associated 
+                                    that we receive the "time limit infeasible" at every child node until the associated 
                                     subproblem becomes easy enough to show that the MIP is infeasible within "time_limit." 
                                     Hence, allowing the initial MIP to run until infeasibility is proved can significantly 
                                     reduce overall BB time.
@@ -306,7 +306,7 @@ Notes:
                                                     (default value - 1800)
     
     49) -dualGapLimit   Values: positive reals -    BB is terminated when the dual gap falls below its value. This value
-    												indicates a percentage and should be on the scale 0-100. Note that 
+                                                    indicates a percentage and should be on the scale 0-100. Note that 
                                                     unlike single objective MIP, dual information is not readily available 
                                                     and must be constructed in order to be utilized. This information is 
                                                     NOT generated unless -showProgress = T. Therefore, unless -
